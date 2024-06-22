@@ -55,10 +55,6 @@ catch {
 $fileSize = (Get-Item $sourceFilePath).Length
 Write-Host "File size: $fileSize bytes"
 
-# Calculate the required rate in bytes per second
-$rateBps = $fileSize / $videoDuration
-Write-Host "Required rate: $rateBps bytes per second"
-
 # Get the metadata size
 try {
     $metadataSize = Get-MetadataSize $sourceFilePath
@@ -68,6 +64,10 @@ catch {
     Write-Host $_
     exit 1
 }
+
+# Calculate the required rate in bytes per second
+$rateBps = ($fileSize - $metadataSize) / $videoDuration
+Write-Host "Required rate: $rateBps bytes per second"
 
 # Convert user-defined buffer size to bytes
 $bufferSizeBytes = $bufferSizeMB * 1024 * 1024
@@ -113,21 +113,25 @@ catch {
     exit 1
 }
 
-# Timer to measure copy rate
+# Separating the bytes of non-metadata and metadata data apart, so that target time and actal rate is calculated accurately.
+$totalBytesAtRateRead = 0
+
+# Timer to measure copy rate of non-metadata data
 $startTime = [System.Diagnostics.Stopwatch]::StartNew()
 
 try {
     while (($bytesRead = $sourceStream.Read($buffer, 0, $buffer.Length)) -gt 0) {
         $destinationStream.Write($buffer, 0, $bytesRead)
-        $totalBytesRead += $bytesRead
+        $totalBytesAtRateRead += $bytesRead
+        $totalBytesRead += $totalBytesAtRateRead
 
         # Calculate elapsed time and actual copy rate
         $elapsedTime = $startTime.Elapsed.TotalSeconds
-        $actualRateBps = $totalBytesRead / $elapsedTime
-        Write-Host "Copied $totalBytesRead bytes at $([math]::Round($actualRateBps / 1024, 2)) KBps..."
+        $actualRateBps = $totalBytesAtRateRead / $elapsedTime
+        Write-Host "Copied $totalBytesRead bytes at $([math]::Round($actualRateBps / 1024, 2)) KBps... with sleep time $($sleepTime * 1000)"
 
         # Sleep to maintain the target copy rate
-        $targetTime = $totalBytesRead / $rateBps
+        $targetTime = $totalBytesAtRateRead / $rateBps
         $sleepTime = $targetTime - $elapsedTime
         if ($sleepTime -gt 0) {
             Start-Sleep -Milliseconds ([math]::Round($sleepTime * 1000))
