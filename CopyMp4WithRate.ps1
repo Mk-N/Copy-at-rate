@@ -1,15 +1,8 @@
 param (
     [string]$sourceFilePath,
     [string]$destinationFilePath,
-    [int]$bufferSizeMB = 10, # User-defined buffer size in MB
-    [string]$logFilePath = "copy_log.txt"  # Default log file path
+    [int]$bufferSizeMB = 10  # User-defined buffer size in MB
 )
-
-# Function to write logs to both the console and the log file
-function Write-Log($message) {
-    Write-Host $message
-    Add-Content -Path $logFilePath -Value $message
-}
 
 # Function to get the video duration in seconds using ffmpeg
 function Get-VideoDurationInSeconds($filePath) {
@@ -48,39 +41,31 @@ function Get-MetadataSize($filePath) {
     }
 }
 
-# Create or clear the log file
-if (Test-Path $logFilePath) {
-    Clear-Content $logFilePath
-}
-else {
-    New-Item -Path $logFilePath -ItemType File
-}
-
 # Get the video duration in seconds
 try {
     $videoDuration = Get-VideoDurationInSeconds $sourceFilePath
-    Write-Log "Video duration: $videoDuration seconds"
+    Write-Host "Video duration: $videoDuration seconds"
 }
 catch {
-    Write-Log $_
+    Write-Host $_
     exit 1
 }
 
 # Get the size of the file in bytes
 $fileSize = (Get-Item $sourceFilePath).Length
-Write-Log "File size: $fileSize bytes"
+Write-Host "File size: $fileSize bytes"
 
 # Calculate the required rate in bytes per second
 $rateBps = $fileSize / $videoDuration
-Write-Log "Required rate: $rateBps bytes per second"
+Write-Host "Required rate: $rateBps bytes per second"
 
 # Get the metadata size
 try {
     $metadataSize = Get-MetadataSize $sourceFilePath
-    Write-Log "Metadata size: $metadataSize bytes"
+    Write-Host "Metadata size: $metadataSize bytes"
 }
 catch {
-    Write-Log $_
+    Write-Host $_
     exit 1
 }
 
@@ -97,8 +82,8 @@ if ($delayMilliseconds -lt 1) {
     $chunkSize = [math]::Round($rateBps / 1000)  # Adjust chunk size so rate per ms is approximately the specified rate
 }
 
-Write-Log "Chunk size: $chunkSize bytes"
-Write-Log "Delay: $delayMilliseconds milliseconds"
+Write-Host "Chunk size: $chunkSize bytes"
+Write-Host "Delay: $delayMilliseconds milliseconds"
 
 # Open the source stream for reading and the destination stream for writing
 $sourceStream = [System.IO.File]::OpenRead($sourceFilePath)
@@ -119,10 +104,10 @@ function CopyInitialBuffer($initialBytes) {
 $initialBytes = $metadataSize + $bufferSizeBytes
 try {
     $totalBytesRead += CopyInitialBuffer $initialBytes
-    Write-Log "Initial metadata and buffer of $initialBytes bytes copied quickly."
+    Write-Host "Initial metadata and buffer of $initialBytes bytes copied quickly."
 }
 catch {
-    Write-Log "Error occurred during initial buffer copy: $_"
+    Write-Host "Error occurred during initial buffer copy: $_"
     $sourceStream.Close()
     $destinationStream.Close()
     exit 1
@@ -139,7 +124,7 @@ try {
         # Calculate elapsed time and actual copy rate
         $elapsedTime = $startTime.Elapsed.TotalSeconds
         $actualRateBps = $totalBytesRead / $elapsedTime
-        Write-Log "Copied $totalBytesRead bytes at $([math]::Round($actualRateBps / 1024, 2)) KBps..."
+        Write-Host "Copied $totalBytesRead bytes at $([math]::Round($actualRateBps / 1024, 2)) KBps..."
 
         # Sleep to maintain the target copy rate
         $targetTime = $totalBytesRead / $rateBps
@@ -150,12 +135,12 @@ try {
     }
 }
 catch {
-    Write-Log "Error occurred during file copy: $_"
+    Write-Host "Error occurred during file copy: $_"
 }
 finally {
     $sourceStream.Close()
     $destinationStream.Close()
 }
 
-Write-Log "File copy completed. Total bytes copied: $totalBytesRead"
-Write-Log "Target copy duration: $videoDuration seconds"
+Write-Host "File copy completed. Total bytes copied: $totalBytesRead"
+Write-Host "Target copy duration: $videoDuration seconds"
