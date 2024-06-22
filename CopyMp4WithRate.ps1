@@ -2,16 +2,13 @@ param (
     [string]$sourceFilePath,
     [string]$destinationFilePath,
     [int]$bufferSizeMB = 10, # User-defined buffer size in MB
-    [bool]$enableLogging = $false, # Enable or disable logging
     [string]$logFilePath = "copy_log.txt"  # Default log file path
 )
 
-# Function to write logs to both the console and the log file (if logging is enabled)
+# Function to write logs to both the console and the log file
 function Write-Log($message) {
     Write-Host $message
-    if ($enableLogging) {
-        Add-Content -Path $logFilePath -Value $message
-    }
+    Add-Content -Path $logFilePath -Value $message
 }
 
 # Function to get the video duration in seconds using ffmpeg
@@ -51,14 +48,12 @@ function Get-MetadataSize($filePath) {
     }
 }
 
-# Initialize or clear the log file if logging is enabled
-if ($enableLogging) {
-    if (Test-Path $logFilePath) {
-        Clear-Content $logFilePath
-    }
-    else {
-        New-Item -Path $logFilePath -ItemType File
-    }
+# Create or clear the log file
+if (Test-Path $logFilePath) {
+    Clear-Content $logFilePath
+}
+else {
+    New-Item -Path $logFilePath -ItemType File
 }
 
 # Get the video duration in seconds
