@@ -126,8 +126,8 @@ try {
         $totalBytesRead += $totalBytesAtRateRead
 
         # Calculate elapsed time and actual copy rate
-        $elapsedTime = $startTime.Elapsed.TotalSeconds
-        $actualRateBps = $totalBytesAtRateRead / $elapsedTime
+        [decimal]$elapsedTime = $startTime.Elapsed.TotalSeconds
+        [decimal]$actualRateBps = $totalBytesAtRateRead / $elapsedTime
         Write-Host "Copied $totalBytesRead bytes at $([math]::Round($actualRateBps / 1024, 2)) KBps... with sleep time $($sleepTime * 1000)"
 
         # Sleep to maintain the target copy rate
@@ -142,6 +142,8 @@ catch {
     Write-Host "Error occurred during file copy: $_"
 }
 finally {
+    $startTime.Stop()
+    $startTime.Reset()
     $sourceStream.Close()
     $destinationStream.Close()
 }
