@@ -2,7 +2,8 @@ param (
     [string]$sourceFilePath,
     [string]$destinationFilePath,
     [int]$bufferSizeMB = 10, # User-defined buffer size in MB
-    [string]$logFilePath = "", # Path to the log file
+    [int]$minChunkSizeKB = 1, # Minimum chunk size in KB
+    [string]$logFilePath = "Log.txt", # Path to the log file
     [switch]$logToFile = $false # Switch to enable/disable logging to file
 )
 
@@ -92,8 +93,8 @@ if ($delayMilliseconds -lt 1) {
     $chunkSize = [math]::Round($rateBps / 1000)  # Adjust chunk size so rate per ms is approximately the specified rate
 }
 
-Write-Log "Chunk size: $chunkSize bytes"
-Write-Log "Delay: $delayMilliseconds milliseconds"
+Write-Log "Initial chunk size: $chunkSize bytes"
+Write-Log "Initial delay: $delayMilliseconds milliseconds"
 
 # Open the source stream for reading and the destination stream for writing
 $sourceStream = [System.IO.File]::OpenRead($sourceFilePath)
@@ -138,13 +139,33 @@ try {
         # Calculate elapsed time and actual copy rate
         [decimal]$elapsedTime = $startTime.Elapsed.TotalSeconds
         [decimal]$actualRateBps = $totalBytesAtRateRead / $elapsedTime
-        Write-Log "Copied $totalBytesRead bytes at $([math]::Round($actualRateBps / 1024, 2)) KBps... with sleep time $($sleepTime * 1000)"
 
         # Sleep to maintain the target copy rate
         [decimal]$targetTime = $totalBytesAtRateRead / $rateBps
         [decimal]$sleepTime = $targetTime - $elapsedTime
         if ($sleepTime -gt 0) {
             Start-Sleep -Milliseconds ([math]::Floor($sleepTime * 1000))
+        }
+        else {
+            # Adjust chunk size if falling behind
+            $chunkSize = [math]::Min($chunkSize * 2, $bufferSizeBytes)
+            $buffer = New-Object byte[] $chunkSize
+            Write-Log "Falling behind, increasing chunk size to $chunkSize bytes"
+        }
+
+        # Reduce chunk size if too far ahead
+        if ($sleepTime -gt 1000) {
+            if ($chunkSize -gt ($minChunkSizeKB * 1024)) {
+                $chunkSize = [math]::Max([math]::Floor($chunkSize / 2), $minChunkSizeKB * 1024)
+                $buffer = New-Object byte[] $chunkSize
+                Write-Log "Too far ahead, reducing chunk size to $chunkSize bytes"
+            }
+            else {
+                $extraSleepTime = [math]::Min([math]::Floor($sleepTime - 1000), 1000) # Cap the extra sleep time to 1 second
+                Write-Log "Too far ahead, already at minimum chunk size. Adding extra sleep time of $extraSleepTime milliseconds."
+                Start-Sleep -Milliseconds $extraSleepTime
+            }
+            Write-Log "Copied $totalBytesRead bytes at $([math]::Round($actualRateBps / 1024, 2)) KBps... with sleep time $($sleepTime * 1000)"
         }
     }
 }
