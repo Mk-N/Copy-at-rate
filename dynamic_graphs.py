@@ -26,7 +26,7 @@ def update_graphs(i):
 	plt.ylabel('Data Rate (KBps)')
 	plt.legend()
 	plt.title('Data Rate vs Bytes Copied')
-	plt.savefig(f"{graph_directory}/{dataRateGraphName}")
+	plt.savefig(f"{graph_directory}\{dataRateGraphName}")
 
 	# Second Graph: Bytes copied vs Sleep time and Chunk size
 	plt.figure(2)
@@ -37,7 +37,7 @@ def update_graphs(i):
 	plt.ylabel('Sleep Time (ms) / Chunk Size (bytes)')
 	plt.legend()
 	plt.title('Sleep Time and Chunk Size vs Bytes Copied')
-	plt.savefig(f"{graph_directory2}/{sleepChunkGraphName}")
+	plt.savefig(f"{graph_directory2}\{sleepChunkGraphName}")
 
 if __name__ == "__main__":
 	plt.figure(1)
