@@ -9,7 +9,8 @@ param (
     [string]$graphDirectory = "", # Directory to save graphs
     [string]$graphDirectory2 = "", # Optional second directory for second graph
     [string]$dataRateGraphName = "data_rate_vs_bytes_copied.svg", # Name of the data rate vs bytes copied graph
-    [string]$sleepChunkGraphName = "sleep_time_chunk_size_vs_bytes_copied.svg" # Name of the sleep time and chunk size vs bytes copied graph
+    [string]$sleepChunkGraphName = "sleep_time_chunk_size_vs_bytes_copied.svg", # Name of the sleep time and chunk size vs bytes copied graph
+    [string]$PythonScriptFilePath = ""
 )
 
 # Function to get the video duration in seconds using ffmpeg
@@ -167,7 +168,7 @@ $startTime = [System.Diagnostics.Stopwatch]::StartNew()
 
 if ($enableGraphs) {
     # Start the Python script for dynamic graphing
-    Start-Process "python" -ArgumentList "path/to/your/dynamic_graphs.py", $logFilePath, $graphDirectory, $graphDirectory2, $dataRateGraphName, $sleepChunkGraphName
+    Start-Process "python" -ArgumentList "$PythonScriptFilePath", $logFilePath, $graphDirectory, $graphDirectory2, $dataRateGraphName, $sleepChunkGraphName
 }
 
 try {
