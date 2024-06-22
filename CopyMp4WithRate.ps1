@@ -2,9 +2,12 @@ param (
     [string]$sourceFilePath,
     [string]$destinationFilePath,
     [int]$bufferSizeMB = 10, # User-defined buffer size in MB
-    [int]$minChunkSizeKB = 1, # Minimum chunk size in KB
-    [string]$logFilePath = "Log.txt", # Path to the log file
-    [switch]$logToFile = $false # Switch to enable/disable logging to file
+    [int]$minChunkSizeKB = 4, # Minimum chunk size in KB
+    [string]$logFilePath = "", # Path to the log file
+    [switch]$logToFile = $false, # Switch to enable/disable logging to file
+    [string]$graphDirectory = "", # Directory to save graphs
+    [switch]$enableGraphs = $false, # Switch to enable/disable graphs
+    [string]$graphDirectory2 = "" # Optional second directory for second graph
 )
 
 # Function to get the video duration in seconds using ffmpeg
@@ -52,6 +55,18 @@ function Write-Log($message) {
     }
 }
 
+# Function to log data to CSV
+function Write-CSVLog($bytesCopied, $dataRate, $targetDataRate, $sleepTime, $chunkSize) {
+    $csvLine = "$bytesCopied,$dataRate,$targetDataRate,$sleepTime,$chunkSize"
+    Add-Content -Path $logFilePath -Value $csvLine
+}
+
+# Initialize CSV log
+if ($logToFile) {
+    $csvHeader = "BytesCopied,DataRateKBps,TargetDataRateKBps,SleepTimeMs,ChunkSize"
+    Set-Content -Path $logFilePath -Value $csvHeader
+}
+
 # Get the video duration in seconds
 try {
     $videoDuration = Get-VideoDurationInSeconds $sourceFilePath
@@ -78,7 +93,8 @@ catch {
 
 # Calculate the required rate in bytes per second
 $rateBps = ($fileSize - $metadataSize) / $videoDuration
-Write-Log "Required rate: $rateBps bytes per second"
+$targetRateKBps = [math]::Round($rateBps / 1024, 2)
+Write-Log "Required rate: $rateBps bytes per second ($targetRateKBps KBps)"
 
 # Convert user-defined buffer size to bytes
 $bufferSizeBytes = $bufferSizeMB * 1024 * 1024
@@ -130,6 +146,11 @@ $totalBytesAtRateRead = 0
 # Timer to measure copy rate of non-metadata data
 $startTime = [System.Diagnostics.Stopwatch]::StartNew()
 
+if ($enableGraphs) {
+    # Start the Python script for dynamic graphing
+    Start-Process "python" -ArgumentList "path/to/your/dynamic_graphs.py", $logFilePath, $graphDirectory, $graphDirectory2
+}
+
 try {
     while (($bytesRead = $sourceStream.Read($buffer, 0, $buffer.Length)) -gt 0) {
         $destinationStream.Write($buffer, 0, $bytesRead)
@@ -139,6 +160,13 @@ try {
         # Calculate elapsed time and actual copy rate
         [decimal]$elapsedTime = $startTime.Elapsed.TotalSeconds
         [decimal]$actualRateBps = $totalBytesAtRateRead / $elapsedTime
+        [decimal]$actualRateKBps = [math]::Round($actualRateBps / 1024, 2)
+        Write-Log "Copied $totalBytesRead bytes at $actualRateKBps KBps... with sleep time $($sleepTime * 1000) ms"
+
+        # Log data to CSV
+        if ($logToFile) {
+            Write-CSVLog $totalBytesRead $actualRateKBps $targetRateKBps $delayMilliseconds $chunkSize
+        }
 
         # Sleep to maintain the target copy rate
         [decimal]$targetTime = $totalBytesAtRateRead / $rateBps
@@ -165,7 +193,6 @@ try {
                 Write-Log "Too far ahead, already at minimum chunk size. Adding extra sleep time of $extraSleepTime milliseconds."
                 Start-Sleep -Milliseconds $extraSleepTime
             }
-            Write-Log "Copied $totalBytesRead bytes at $([math]::Round($actualRateBps / 1024, 2)) KBps... with sleep time $($sleepTime * 1000)"
         }
     }
 }
