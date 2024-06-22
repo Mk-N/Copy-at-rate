@@ -7,7 +7,9 @@ param (
     [string]$logFilePath = ".\Log.txt", # Path to the log file
     [switch]$enableGraphs = $false, # Switch to enable/disable graphs
     [string]$graphDirectory = "", # Directory to save graphs
-    [string]$graphDirectory2 = "" # Optional second directory for second graph
+    [string]$graphDirectory2 = "", # Optional second directory for second graph
+    [string]$dataRateGraphName = "data_rate_vs_bytes_copied.svg", # Name of the data rate vs bytes copied graph
+    [string]$sleepChunkGraphName = "sleep_time_chunk_size_vs_bytes_copied.svg" # Name of the sleep time and chunk size vs bytes copied graph
 )
 
 # Function to get the video duration in seconds using ffmpeg
@@ -33,6 +35,17 @@ function Get-VideoDurationInSeconds($filePath) {
     }
     catch {
         throw "Error occurred while determining video duration: $_"
+    }
+}
+
+# Function to get the size of the file in bytes
+function Get-FileSize($filePath) {
+    try {
+        $fileInfo = Get-Item $filePath
+        return $fileInfo.Length
+    }
+    catch {
+        throw "Error occurred while determining file size: $_"
     }
 }
 
@@ -78,8 +91,14 @@ catch {
 }
 
 # Get the size of the file in bytes
-$fileSize = (Get-Item $sourceFilePath).Length
-Write-Log "File size: $fileSize bytes"
+try {
+    $fileSize = Get-FileSize $sourceFilePath
+    Write-Log "File size: $fileSize bytes"
+}
+catch {
+    Write-Log $_
+    exit 1
+}
 
 # Get the metadata size
 try {
@@ -148,7 +167,7 @@ $startTime = [System.Diagnostics.Stopwatch]::StartNew()
 
 if ($enableGraphs) {
     # Start the Python script for dynamic graphing
-    Start-Process "python" -ArgumentList "path/to/your/dynamic_graphs.py", $logFilePath, $graphDirectory, $graphDirectory2
+    Start-Process "python" -ArgumentList "path/to/your/dynamic_graphs.py", $logFilePath, $graphDirectory, $graphDirectory2, $dataRateGraphName, $sleepChunkGraphName
 }
 
 try {
@@ -184,7 +203,7 @@ try {
         # Reduce chunk size if too far ahead
         if ($sleepTime -gt 1000) {
             if ($chunkSize -gt ($minChunkSizeKB * 1024)) {
-                $chunkSize = [math]::Max([math]::Floor($chunkSize / 2), $minChunkSizeKB * 1024)
+                $chunkSize = [math]::Max([math]::Round($chunkSize / 2), ($minChunkSizeKB * 1024)) # round now because this tends to overshoot
                 $buffer = New-Object byte[] $chunkSize
                 Write-Log "Too far ahead, reducing chunk size to $chunkSize bytes"
             }
