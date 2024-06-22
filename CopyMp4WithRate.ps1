@@ -131,10 +131,10 @@ try {
         Write-Host "Copied $totalBytesRead bytes at $([math]::Round($actualRateBps / 1024, 2)) KBps... with sleep time $($sleepTime * 1000)"
 
         # Sleep to maintain the target copy rate
-        $targetTime = $totalBytesAtRateRead / $rateBps
-        $sleepTime = $targetTime - $elapsedTime
+        [decimal]$targetTime = $totalBytesAtRateRead / $rateBps
+        [decimal]$sleepTime = $targetTime - $elapsedTime
         if ($sleepTime -gt 0) {
-            Start-Sleep -Milliseconds ([math]::Round($sleepTime * 1000))
+            Start-Sleep -Milliseconds ([math]::Floor($sleepTime * 1000))
         }
     }
 }
