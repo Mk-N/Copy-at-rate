@@ -10,7 +10,7 @@ param (
     [string]$graphDirectory2 = "", # Optional second directory for second graph
     [string]$dataRateGraphName = "data_rate_vs_bytes_copied.svg", # Name of the data rate vs bytes copied graph
     [string]$sleepChunkGraphName = "sleep_time_chunk_size_vs_bytes_copied.svg", # Name of the sleep time and chunk size vs bytes copied graph
-    [string]$PythonScriptFilePath = ""
+    [string]$pythonScriptFilePath = ""
 )
 
 # Function to get the video duration in seconds using ffmpeg
