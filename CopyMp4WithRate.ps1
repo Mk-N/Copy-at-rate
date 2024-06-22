@@ -3,10 +3,10 @@ param (
     [string]$destinationFilePath,
     [int]$bufferSizeMB = 10, # User-defined buffer size in MB
     [int]$minChunkSizeKB = 4, # Minimum chunk size in KB
-    [string]$logFilePath = ".\Log.txt", # Path to the log file
     [switch]$logToFile = $false, # Switch to enable/disable logging to file
-    [string]$graphDirectory = "", # Directory to save graphs
+    [string]$logFilePath = ".\Log.txt", # Path to the log file
     [switch]$enableGraphs = $false, # Switch to enable/disable graphs
+    [string]$graphDirectory = "", # Directory to save graphs
     [string]$graphDirectory2 = "" # Optional second directory for second graph
 )
 
