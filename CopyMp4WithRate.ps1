@@ -78,11 +78,12 @@ function Copy-WithRateControl {
             $elapsedSeconds = (Get-Date) - $startTime
             $currentRateBps = $totalBytesRead / $elapsedSeconds.TotalSeconds
 
+            # Adjust chunk size based on current vs desired rate
             if ($currentRateBps -gt $rateBps) {
-                $chunkSize = [Math]::Max([Math]::Ceiling(($rateBps / $currentRateBps) * $chunkSize), 1024)
-            }
-            elseif ($currentRateBps -lt $rateBps) {
-                $chunkSize = [Math]::Min($chunkSize * 2, $fileSize - $totalBytesRead)
+                $sleepTimeMs = [Math]::Ceiling(($totalBytesRead / $rateBps) * 1000) - [Math]::Ceiling($elapsedSeconds.TotalMilliseconds)
+                if ($sleepTimeMs -gt 0) {
+                    Start-Sleep -Milliseconds $sleepTimeMs
+                }
             }
         }
     }
