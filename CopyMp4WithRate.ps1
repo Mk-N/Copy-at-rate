@@ -146,9 +146,14 @@ try {
         $actualRateBps = $totalBytesRead / $elapsedTime
         Write-Log "Copied $totalBytesRead bytes at $([math]::Round($actualRateBps / 1024, 2)) KBps..."
 
+        # Calculate remaining bytes to copy
+        $remainingBytes = $fileSize - $totalBytesRead
+
+        # Calculate remaining time based on current rate
+        $remainingTime = $remainingBytes / $actualRateBps
+
         # Sleep to maintain the target copy rate
-        $targetTime = $totalBytesRead / $rateBps
-        $sleepTime = $targetTime - $elapsedTime
+        $sleepTime = $remainingTime - $elapsedTime
         if ($sleepTime -gt 0) {
             Start-Sleep -Milliseconds ([math]::Round($sleepTime * 1000))
         }
