@@ -10,3 +10,4 @@ Open PowerShell and run the script with the following command, replacing the par
 > .\CopyMp4WithRate.ps1 -sourceFilePath "C:\path\to\source\video.mp4" -destinationFilePath "C:\path\to\destination\video.mp4" -bufferSizeMB 10 -enableLogging $true -logFilePath "C:\path\to\copy_log.txt"
 
 FFMpeg must be installed and added to your path for CopyMP4.
+Python file requires pandas and matplotlib.
