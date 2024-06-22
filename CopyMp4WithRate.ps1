@@ -180,12 +180,6 @@ try {
         [decimal]$elapsedTime = $startTime.Elapsed.TotalSeconds
         [decimal]$actualRateBps = $totalBytesAtRateRead / $elapsedTime
         [decimal]$actualRateKBps = [math]::Round($actualRateBps / 1024, 2)
-        Write-Log "Copied $totalBytesRead bytes at $actualRateKBps KBps... with sleep time $($sleepTime * 1000) ms"
-
-        # Log data to CSV
-        if ($logToFile) {
-            Write-CSVLog $totalBytesRead $actualRateKBps $targetRateKBps $delayMilliseconds $chunkSize
-        }
 
         # Sleep to maintain the target copy rate
         [decimal]$targetTime = $totalBytesAtRateRead / $rateBps
@@ -212,6 +206,14 @@ try {
                 Write-Log "Too far ahead, already at minimum chunk size. Adding extra sleep time of $extraSleepTime milliseconds."
                 Start-Sleep -Milliseconds $extraSleepTime
             }
+        }
+
+        #log data
+        Write-Log "Copied $totalBytesRead bytes at $actualRateKBps KBps with sleep time $($sleepTime * 1000) ms"
+
+        # Log data to CSV
+        if ($logToFile) {
+            Write-CSVLog $totalBytesRead $actualRateKBps $targetRateKBps $delayMilliseconds $chunkSize
         }
     }
 }
