@@ -1,6 +1,9 @@
 # Copy-at-rate
  Predominantly for video copying at the same rate that it is played to ensure that ssd usage is optimised in playback from a source
 
+## What is it
+The CopyFileWithRate program is more generic and is for any file type, allowing the user to set a rate. The CopyMp4WithRate copies an MP4 at a rate similiar to its totla datarate.
+
 ## How to run
 Open PowerShell and run the script with the following command, replacing the parameters with your actual file paths, desired buffer size, and log file path. Enable logging if needed:
 
