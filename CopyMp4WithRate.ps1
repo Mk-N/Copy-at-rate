@@ -40,132 +40,84 @@ function Get-VideoDurationInSeconds($filePath) {
     }
 }
 
-# Function to get the size of the metadata
-function Get-MetadataSize($filePath) {
+# Function to get the size of the file in bytes
+function Get-FileSize($filePath) {
     try {
-        $ffmpegOutput = & ffmpeg -i $filePath -f ffmetadata - 2>&1 | Out-String
-        return [System.Text.Encoding]::UTF8.GetBytes($ffmpegOutput).Length
+        return (Get-Item $filePath).Length
     }
     catch {
-        throw "Error occurred while determining metadata size: $_"
+        throw "Error occurred while determining file size: $_"
     }
 }
 
-# Initialize or clear the log file if logging is enabled
-if ($enableLogging) {
-    if (Test-Path $logFilePath) {
-        Clear-Content $logFilePath
-    }
-    else {
-        New-Item -Path $logFilePath -ItemType File
-    }
-}
+# Function to copy the file with rate control
+function Copy-WithRateControl {
+    param (
+        [System.IO.Stream]$sourceStream,
+        [System.IO.Stream]$destinationStream,
+        [long]$fileSize,
+        [double]$rateBps
+    )
 
-# Get the video duration in seconds
-try {
-    $videoDuration = Get-VideoDurationInSeconds $sourceFilePath
-    Write-Log "Video duration: $videoDuration seconds"
-}
-catch {
-    Write-Log $_
-    exit 1
-}
+    $chunkSize = 64 * 1024  # Starting chunk size
+    $buffer = New-Object byte[] $chunkSize
+    $totalBytesRead = 0
+    $startTime = Get-Date
 
-# Get the size of the file in bytes
-$fileSize = (Get-Item $sourceFilePath).Length
-Write-Log "File size: $fileSize bytes"
+    try {
+        while ($totalBytesRead -lt $fileSize) {
+            $bytesToRead = [Math]::Min($chunkSize, $fileSize - $totalBytesRead)
+            $bytesRead = $sourceStream.Read($buffer, 0, $bytesToRead)
+            if ($bytesRead -eq 0) {
+                break
+            }
+            $destinationStream.Write($buffer, 0, $bytesRead)
+            $totalBytesRead += $bytesRead
 
-# Calculate the required rate in bytes per second
-$rateBps = $fileSize / $videoDuration
-Write-Log "Required rate: $rateBps bytes per second"
+            # Calculate elapsed time and adjust chunk size dynamically
+            $elapsedSeconds = (Get-Date) - $startTime
+            $currentRateBps = $totalBytesRead / $elapsedSeconds.TotalSeconds
 
-# Get the metadata size
-try {
-    $metadataSize = Get-MetadataSize $sourceFilePath
-    Write-Log "Metadata size: $metadataSize bytes"
-}
-catch {
-    Write-Log $_
-    exit 1
-}
-
-# Convert user-defined buffer size to bytes
-$bufferSizeBytes = $bufferSizeMB * 1024 * 1024
-
-# Set the initial chunk size to 1024 bytes (1 KB) and calculate the delay based on the rate
-$chunkSize = 1024
-$delayMilliseconds = [math]::Round((1000 * $chunkSize) / $rateBps)
-
-# Adjust chunk size if the delay is less than 1 millisecond
-if ($delayMilliseconds -lt 1) {
-    $delayMilliseconds = 1
-    $chunkSize = [math]::Round($rateBps / 1000)  # Adjust chunk size so rate per ms is approximately the specified rate
-}
-
-Write-Log "Chunk size: $chunkSize bytes"
-Write-Log "Delay: $delayMilliseconds milliseconds"
-
-# Open the source stream for reading and the destination stream for writing
-$sourceStream = [System.IO.File]::OpenRead($sourceFilePath)
-$destinationStream = [System.IO.File]::Open($destinationFilePath, [System.IO.FileMode]::Create, [System.IO.FileAccess]::Write, [System.IO.FileShare]::Read)
-
-$buffer = New-Object byte[] $chunkSize
-$totalBytesRead = 0
-
-# Function to copy the initial metadata quickly
-function CopyInitialBuffer($initialBytes) {
-    $initialBuffer = New-Object byte[] $initialBytes
-    $bytesRead = $sourceStream.Read($initialBuffer, 0, $initialBytes)
-    $destinationStream.Write($initialBuffer, 0, $bytesRead)
-    return $bytesRead
-}
-
-# Copy the metadata and initial buffer (user-defined)
-$initialBytes = $metadataSize + $bufferSizeBytes
-try {
-    $totalBytesRead += CopyInitialBuffer $initialBytes
-    Write-Log "Initial metadata and buffer of $initialBytes bytes copied quickly."
-}
-catch {
-    Write-Log "Error occurred during initial buffer copy: $_"
-    $sourceStream.Close()
-    $destinationStream.Close()
-    exit 1
-}
-
-# Timer to measure copy rate
-$startTime = [System.Diagnostics.Stopwatch]::StartNew()
-
-try {
-    while (($bytesRead = $sourceStream.Read($buffer, 0, $buffer.Length)) -gt 0) {
-        $destinationStream.Write($buffer, 0, $bytesRead)
-        $totalBytesRead += $bytesRead
-
-        # Calculate elapsed time and actual copy rate
-        $elapsedTime = $startTime.Elapsed.TotalSeconds
-        $actualRateBps = $totalBytesRead / $elapsedTime
-        Write-Log "Copied $totalBytesRead bytes at $([math]::Round($actualRateBps / 1024, 2)) KBps..."
-
-        # Calculate remaining bytes to copy
-        $remainingBytes = $fileSize - $totalBytesRead
-
-        # Calculate remaining time based on current rate
-        $remainingTime = $remainingBytes / $actualRateBps
-
-        # Sleep to maintain the target copy rate
-        $sleepTime = $remainingTime - $elapsedTime
-        if ($sleepTime -gt 0) {
-            Start-Sleep -Milliseconds ([math]::Round($sleepTime * 1000))
+            if ($currentRateBps -gt $rateBps) {
+                $chunkSize = [Math]::Max([Math]::Ceiling(($rateBps / $currentRateBps) * $chunkSize), 1024)
+            }
+            elseif ($currentRateBps -lt $rateBps) {
+                $chunkSize = [Math]::Min($chunkSize * 2, $fileSize - $totalBytesRead)
+            }
         }
     }
-}
-catch {
-    Write-Log "Error occurred during file copy: $_"
-}
-finally {
-    $sourceStream.Close()
-    $destinationStream.Close()
+    catch {
+        throw "Error occurred during file copy: $_"
+    }
+    finally {
+        $sourceStream.Close()
+        $destinationStream.Close()
+    }
 }
 
-Write-Log "File copy completed. Total bytes copied: $totalBytesRead"
-Write-Log "Target copy duration: $videoDuration seconds"
+# Main script execution
+try {
+    # Get video duration and file size
+    $videoDuration = Get-VideoDurationInSeconds $sourceFilePath
+    Write-Log "Video duration: $videoDuration seconds"
+
+    $fileSize = Get-FileSize $sourceFilePath
+    Write-Log "File size: $fileSize bytes"
+
+    # Calculate required rate in bytes per second
+    $rateBps = $fileSize / $videoDuration
+    Write-Log "Required rate: $rateBps bytes per second"
+
+    # Open source and destination streams
+    $sourceStream = [System.IO.File]::OpenRead($sourceFilePath)
+    $destinationStream = [System.IO.File]::OpenWrite($destinationFilePath)
+
+    # Copy file with rate control
+    Copy-WithRateControl -sourceStream $sourceStream -destinationStream $destinationStream -fileSize $fileSize -rateBps $rateBps
+
+    Write-Log "File copy completed successfully."
+}
+catch {
+    Write-Log "Error: $_"
+    exit 1
+}
