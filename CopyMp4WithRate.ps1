@@ -11,7 +11,8 @@ param (
     [string]$graphDirectory2 = "", # Optional second directory for second graph
     [string]$dataRateGraphName = "data_rate_vs_bytes_copied.svg", # Name of the data rate vs bytes copied graph
     [string]$sleepChunkGraphName = "sleep_time_chunk_size_vs_bytes_copied.svg", # Name of the sleep time and chunk size vs bytes copied graph
-    [string]$pythonScriptFilePath = ""
+    [string]$pythonScriptFilePath = "",
+    [string]$venvActivateScript = "D:\Creative work\Copy-at-rate\.venv\Scripts\Activate.ps1"
 )
 
 # Function to perform accurate division of a numerator by a denominator
@@ -234,14 +235,21 @@ catch {
 [decimal]$totalBytesAtRateRead = 0
 
 if ($enableGraphs) {
+
+    # Path to your virtual environment activation script
+    $venvActivateScript = "D:\Creative work\Copy-at-rate\.venv\Scripts\Activate.ps1"
+
     # Create an array of arguments
-    $arguments = @($logFilePath, $graphDirectory, $graphDirectory2, $dataRateGraphName, $sleepChunkGraphName)
+    $arguments = @("'$CSVlogFilePath'", "'$graphDirectory'", "'$graphDirectory2'", "'$dataRateGraphName'", "'$sleepChunkGraphName'")
 
     # Join arguments into a single string separated by spaces
     $argumentString = $arguments -join " "
 
-    # Start the Python script using Start-Process
-    Start-Process python -ArgumentList "$pythonScriptFilePath $argumentString" -Wait
+    # Construct the full command to activate the virtual environment and run the Python script
+    $fullCommand = "& '$venvActivateScript'; python '$pythonScriptFilePath' $argumentString"
+
+    # Start the process without waiting for it to complete
+    Start-Process powershell.exe -ArgumentList "-NoProfile", "-ExecutionPolicy Bypass", "-Command $fullCommand" -NoNewWindow
 }
 
 # Timer to measure copy rate of non-metadata data
@@ -288,6 +296,7 @@ try {
                 $extraSleepTime = [math]::Min([math]::Floor($sleepTime - 1000), 1000) # Cap the extra sleep time to 1 second
                 Write-Log "Too far ahead, already at minimum chunk size. Adding extra sleep time of $extraSleepTime milliseconds."
                 Start-Sleep -Milliseconds $extraSleepTime
+                $sleepTime += $extraSleepTime
             }
         }
 
@@ -296,7 +305,7 @@ try {
 
         # Log data to CSV
         if ($logToFile) {
-            Write-CSVLog $totalBytesRead $actualRateKBps $targetRateKBps $delayMilliseconds $chunkSize
+            Write-CSVLog $totalBytesRead $actualRateKBps $targetRateKBps $sleepTime $chunkSize
         }
     }
 }
