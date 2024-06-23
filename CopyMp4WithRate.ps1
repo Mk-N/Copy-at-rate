@@ -179,9 +179,7 @@ catch {
 }
 
 # Calculate the required rate in bytes per second
-Write-Log "line 116"
 [decimal]$rateBps = ($fileSize - $metadataSize) / $videoDuration
-Write-Log "line 119"
 [decimal]$targetRateKBps = $rateBps / 1024
 Write-Log "Required rate: $rateBps bytes per second ($targetRateKBps KBps)"
 
@@ -190,13 +188,11 @@ $bufferSizeBytes = $bufferSizeMB * 1024 * 1024
 
 # Set the initial chunk size to 1024 bytes (1 KB) or user min, whichever is greater, and calculate the delay based on the rate
 $chunkSize = [math]::Max(($minChunkSizeKB * 1024), 1024)
-Write-Log "line 128"
 $delayMilliseconds = [math]::Round((1000 * $chunkSize) / $rateBps)
 
 # Adjust chunk size if the delay is less than 1 millisecond
 if ($delayMilliseconds -lt 1) {
     $delayMilliseconds = 1
-    Write-Log "line 134"
     $chunkSize = [math]::Round($rateBps / 1000)  # Adjust chunk size so rate per ms is approximately the specified rate
 }
 
@@ -263,15 +259,12 @@ try {
 
         # Calculate elapsed time and actual copy rate
         [decimal]$elapsedTime = $startTime.Elapsed.TotalSeconds
-        Write-Log "line 187"
         Write-Log "$elapsedTime"
         Write-Log "$totalBytesAtRateRead"
         [decimal]$actualRateBps = $totalBytesAtRateRead / $elapsedTime
-        Write-Log "line 190"
         [decimal]$actualRateKBps = $actualRateBps / 1024
 
         # Sleep to maintain the target copy rate
-        Write-Log "line 193"
         [decimal]$targetTime = $totalBytesAtRateRead / $rateBps
         [decimal]$sleepTime = $targetTime - $elapsedTime
         if ($sleepTime -gt 0) {
@@ -287,7 +280,6 @@ try {
         # Reduce chunk size if too far ahead
         if ($sleepTime -gt 1000) {
             if ($chunkSize -gt ($minChunkSizeKB * 1024)) {
-                Write-Log "line 210"
                 $chunkSize = [math]::Max([math]::Round($chunkSize / 2), ($minChunkSizeKB * 1024)) # round now because this tends to overshoot
                 $buffer = New-Object byte[] $chunkSize
                 Write-Log "Too far ahead, reducing chunk size to $chunkSize bytes"
