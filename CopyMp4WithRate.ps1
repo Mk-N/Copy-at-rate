@@ -4,7 +4,8 @@ param (
     [int]$bufferSizeMB = 10, # User-defined buffer size in MB
     [int]$minChunkSizeKB = 4, # Minimum chunk size in KB
     [switch]$logToFile = $false, # Switch to enable/disable logging to file
-    [string]$logFilePath = ".\Log.txt", # Path to the log file
+    [string]$logFilePath = "logs\Log.txt", # Path to the log file
+    [string]$CSVlogFilePath = "logs\CSVLog.csv", # Path to the log file
     [switch]$enableGraphs = $false, # Switch to enable/disable graphs
     [string]$graphDirectory = "", # Directory to save graphs
     [string]$graphDirectory2 = "", # Optional second directory for second graph
@@ -72,13 +73,13 @@ function Write-Log($message) {
 # Function to log data to CSV
 function Write-CSVLog($bytesCopied, $dataRate, $targetDataRate, $sleepTime, $chunkSize) {
     $csvLine = "$bytesCopied,$dataRate,$targetDataRate,$sleepTime,$chunkSize"
-    Add-Content -Path $logFilePath -Value $csvLine
+    Add-Content -Path $CSVlogFilePath -Value $csvLine
 }
 
 # Initialize CSV log
 if ($logToFile) {
     $csvHeader = "BytesCopied,DataRateKBps,TargetDataRateKBps,SleepTimeMs,ChunkSize"
-    Set-Content -Path $logFilePath -Value $csvHeader
+    Set-Content -Path $CSVlogFilePath -Value $csvHeader
 }
 
 # Get the video duration in seconds
