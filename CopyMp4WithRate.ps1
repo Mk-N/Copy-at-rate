@@ -14,6 +14,61 @@ param (
     [string]$pythonScriptFilePath = ""
 )
 
+# Function to perform accurate division of a numerator by a denominator
+function AccurateDivision {
+    param (
+        [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
+        [System.Object]$numerator,
+
+        [Parameter(Mandatory = $true)]
+        [System.Object]$denominator
+    )
+
+    # Convert inputs to strings if they are not already strings
+    $numerator_str = $numerator.ToString()
+    $denominator_str = $denominator.ToString()
+
+    # Validate numerator and denominator as numeric strings
+    if (-not $numerator_str -match '^\d+$') {
+        throw "Numerator must be a positive integer string."
+    }
+
+    if (-not $denominator_str -match '^\d+(\.\d+)?$') {
+        throw "Denominator must be a numeric string."
+    }
+
+    # Parse numerator to [System.Numerics.BigInteger]
+    try {
+        $bigIntNumerator = [System.Numerics.BigInteger]::Parse($numerator_str)
+    }
+    catch {
+        throw "Error parsing numerator '$numerator_str' to BigInteger."
+    }
+
+    # Parse denominator to [decimal]
+    try {
+        $decimalDenominator = [decimal]::Parse($denominator_str)
+    }
+    catch {
+        throw "Error parsing denominator '$denominator_str' to decimal."
+    }
+
+    # Convert decimalDenominator to scaled integer
+    $decimalPlaces = 0
+    if ($denominator_str -match '\.') {
+        $decimalPlaces = $denominator_str.Split('.')[1].Length
+    }
+    $scaledDenominator = [decimal]::Round($decimalDenominator * [decimal]::Parse("1" + ("0" * $decimalPlaces)))
+
+    # Perform division
+    if ($scaledDenominator -eq 0) {
+        throw "Division by zero."
+    }
+    $result = [decimal]::Round($bigIntNumerator / $scaledDenominator, $decimalPlaces)
+
+    return $result
+}
+
 # Function to get the video duration in seconds using ffmpeg
 function Get-VideoDurationInSeconds($filePath) {
     try {
@@ -76,6 +131,16 @@ function Write-CSVLog($bytesCopied, $dataRate, $targetDataRate, $sleepTime, $chu
     Add-Content -Path $CSVlogFilePath -Value $csvLine
 }
 
+try {
+    # Check and load System.Numerics assembly if necessary
+    if (-not ([System.Management.Automation.PSTypeName]'System.Numerics.BigInteger').Type) {
+        Add-Type -AssemblyName System.Numerics
+    }
+}
+catch {
+    Write-Error "An error occurred: $_"
+}
+
 # Initialize CSV log
 if ($logToFile) {
     $csvHeader = "BytesCopied,DataRateKBps,TargetDataRateKBps,SleepTimeMs,ChunkSize"
@@ -113,7 +178,9 @@ catch {
 }
 
 # Calculate the required rate in bytes per second
+Write-Log "line 116"
 [decimal]$rateBps = ($fileSize - $metadataSize) / $videoDuration
+Write-Log "line 119"
 [decimal]$targetRateKBps = $rateBps / 1024
 Write-Log "Required rate: $rateBps bytes per second ($targetRateKBps KBps)"
 
@@ -122,11 +189,13 @@ $bufferSizeBytes = $bufferSizeMB * 1024 * 1024
 
 # Set the initial chunk size to 1024 bytes (1 KB) or user min, whichever is greater, and calculate the delay based on the rate
 $chunkSize = [math]::Max(($minChunkSizeKB * 1024), 1024)
+Write-Log "line 128"
 $delayMilliseconds = [math]::Round((1000 * $chunkSize) / $rateBps)
 
 # Adjust chunk size if the delay is less than 1 millisecond
 if ($delayMilliseconds -lt 1) {
     $delayMilliseconds = 1
+    Write-Log "line 134"
     $chunkSize = [math]::Round($rateBps / 1000)  # Adjust chunk size so rate per ms is approximately the specified rate
 }
 
@@ -138,7 +207,7 @@ $sourceStream = [System.IO.File]::OpenRead($sourceFilePath)
 $destinationStream = [System.IO.File]::Open($destinationFilePath, [System.IO.FileMode]::Create, [System.IO.FileAccess]::Write, [System.IO.FileShare]::Read)
 
 $buffer = New-Object byte[] $chunkSize
-[UInt128]$totalBytesRead = 0
+[decimal]$totalBytesRead = 0
 
 # Function to copy the initial metadata quickly
 function CopyInitialBuffer($initialBytes) {
@@ -151,7 +220,7 @@ function CopyInitialBuffer($initialBytes) {
 # Copy the metadata and initial buffer (user-defined)
 $initialBytes = $metadataSize + $bufferSizeBytes
 try {
-    [UInt128]$totalBytesRead += CopyInitialBuffer $initialBytes
+    [decimal]$totalBytesRead += CopyInitialBuffer $initialBytes
     Write-Log "Initial metadata and buffer of $initialBytes bytes copied quickly."
 }
 catch {
@@ -162,7 +231,7 @@ catch {
 }
 
 # Separating the bytes of non-metadata and metadata data apart, so that target time and actual rate is calculated accurately.
-[UInt128]$totalBytesAtRateRead = 0
+[decimal]$totalBytesAtRateRead = 0
 
 if ($enableGraphs) {
     # Start the Python script for dynamic graphing
@@ -175,15 +244,20 @@ $startTime = [System.Diagnostics.Stopwatch]::StartNew()
 try {
     while (($bytesRead = $sourceStream.Read($buffer, 0, $buffer.Length)) -gt 0) {
         $destinationStream.Write($buffer, 0, $bytesRead)
-        [UInt128]$totalBytesAtRateRead += $bytesRead
-        [UInt128]$totalBytesRead += $totalBytesAtRateRead
+        [decimal]$totalBytesAtRateRead += $bytesRead
+        [decimal]$totalBytesRead += $totalBytesAtRateRead
 
         # Calculate elapsed time and actual copy rate
         [decimal]$elapsedTime = $startTime.Elapsed.TotalSeconds
+        Write-Log "line 187"
+        Write-Log "$elapsedTime"
+        Write-Log "$totalBytesAtRateRead"
         [decimal]$actualRateBps = $totalBytesAtRateRead / $elapsedTime
+        Write-Log "line 190"
         [decimal]$actualRateKBps = $actualRateBps / 1024
 
         # Sleep to maintain the target copy rate
+        Write-Log "line 193"
         [decimal]$targetTime = $totalBytesAtRateRead / $rateBps
         [decimal]$sleepTime = $targetTime - $elapsedTime
         if ($sleepTime -gt 0) {
@@ -191,7 +265,7 @@ try {
         }
         else {
             # Adjust chunk size if falling behind
-            $chunkSize = [math]::Min($chunkSize * 2, $bufferSizeBytes)
+            $chunkSize = $chunkSize * 2
             $buffer = New-Object byte[] $chunkSize
             Write-Log "Falling behind, increasing chunk size to $chunkSize bytes"
         }
@@ -199,6 +273,7 @@ try {
         # Reduce chunk size if too far ahead
         if ($sleepTime -gt 1000) {
             if ($chunkSize -gt ($minChunkSizeKB * 1024)) {
+                Write-Log "line 210"
                 $chunkSize = [math]::Max([math]::Round($chunkSize / 2), ($minChunkSizeKB * 1024)) # round now because this tends to overshoot
                 $buffer = New-Object byte[] $chunkSize
                 Write-Log "Too far ahead, reducing chunk size to $chunkSize bytes"
