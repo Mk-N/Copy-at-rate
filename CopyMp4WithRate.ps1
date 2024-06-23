@@ -2,7 +2,7 @@ param (
     [string]$sourceFilePath,
     [string]$destinationFilePath,
     [int]$bufferSizeMB = 10, # User-defined buffer size in MB
-    [int]$minChunkSizeKB = 4, # Minimum chunk size in KB
+    [int]$minChunkSizeKB = 1, # Minimum chunk size in KB
     [switch]$logToFile = $false, # Switch to enable/disable logging to file
     [string]$logFilePath = "logs\Log.txt", # Path to the log file
     [string]$CSVlogFilePath = "logs\CSVLog.csv", # Path to the log file
@@ -113,15 +113,15 @@ catch {
 }
 
 # Calculate the required rate in bytes per second
-$rateBps = ($fileSize - $metadataSize) / $videoDuration
-$targetRateKBps = [math]::Round($rateBps / 1024, 2)
+[decimal]$rateBps = ($fileSize - $metadataSize) / $videoDuration
+[decimal]$targetRateKBps = $rateBps / 1024
 Write-Log "Required rate: $rateBps bytes per second ($targetRateKBps KBps)"
 
 # Convert user-defined buffer size to bytes
 $bufferSizeBytes = $bufferSizeMB * 1024 * 1024
 
-# Set the initial chunk size to 1024 bytes (1 KB) and calculate the delay based on the rate
-$chunkSize = 1024
+# Set the initial chunk size to 1024 bytes (1 KB) or user min, whichever is greater, and calculate the delay based on the rate
+$chunkSize = [math]::Max(($minChunkSizeKB * 1024), 1024)
 $delayMilliseconds = [math]::Round((1000 * $chunkSize) / $rateBps)
 
 # Adjust chunk size if the delay is less than 1 millisecond
@@ -138,7 +138,7 @@ $sourceStream = [System.IO.File]::OpenRead($sourceFilePath)
 $destinationStream = [System.IO.File]::Open($destinationFilePath, [System.IO.FileMode]::Create, [System.IO.FileAccess]::Write, [System.IO.FileShare]::Read)
 
 $buffer = New-Object byte[] $chunkSize
-$totalBytesRead = 0
+[UInt64]$totalBytesRead = 0
 
 # Function to copy the initial metadata quickly
 function CopyInitialBuffer($initialBytes) {
@@ -151,7 +151,7 @@ function CopyInitialBuffer($initialBytes) {
 # Copy the metadata and initial buffer (user-defined)
 $initialBytes = $metadataSize + $bufferSizeBytes
 try {
-    $totalBytesRead += CopyInitialBuffer $initialBytes
+    [UInt64]$totalBytesRead += CopyInitialBuffer $initialBytes
     Write-Log "Initial metadata and buffer of $initialBytes bytes copied quickly."
 }
 catch {
@@ -162,7 +162,7 @@ catch {
 }
 
 # Separating the bytes of non-metadata and metadata data apart, so that target time and actual rate is calculated accurately.
-$totalBytesAtRateRead = 0
+[UInt64]$totalBytesAtRateRead = 0
 
 if ($enableGraphs) {
     # Start the Python script for dynamic graphing
@@ -175,13 +175,13 @@ $startTime = [System.Diagnostics.Stopwatch]::StartNew()
 try {
     while (($bytesRead = $sourceStream.Read($buffer, 0, $buffer.Length)) -gt 0) {
         $destinationStream.Write($buffer, 0, $bytesRead)
-        $totalBytesAtRateRead += $bytesRead
-        $totalBytesRead += $totalBytesAtRateRead
+        [UInt64]$totalBytesAtRateRead += $bytesRead
+        [UInt64]$totalBytesRead += $totalBytesAtRateRead
 
         # Calculate elapsed time and actual copy rate
         [decimal]$elapsedTime = $startTime.Elapsed.TotalSeconds
         [decimal]$actualRateBps = $totalBytesAtRateRead / $elapsedTime
-        [decimal]$actualRateKBps = [math]::Round($actualRateBps / 1024, 2)
+        [decimal]$actualRateKBps = $actualRateBps / 1024
 
         # Sleep to maintain the target copy rate
         [decimal]$targetTime = $totalBytesAtRateRead / $rateBps
