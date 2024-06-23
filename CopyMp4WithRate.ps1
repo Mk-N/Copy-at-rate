@@ -234,8 +234,14 @@ catch {
 [decimal]$totalBytesAtRateRead = 0
 
 if ($enableGraphs) {
-    # Start the Python script for dynamic graphing
-    Start-Process "python" -ArgumentList "$PythonScriptFilePath", $logFilePath, $graphDirectory, $graphDirectory2, $dataRateGraphName, $sleepChunkGraphName
+    # Create an array of arguments
+    $arguments = @($logFilePath, $graphDirectory, $graphDirectory2, $dataRateGraphName, $sleepChunkGraphName)
+
+    # Join arguments into a single string separated by spaces
+    $argumentString = $arguments -join " "
+
+    # Start the Python script using Start-Process
+    Start-Process python -ArgumentList "$pythonScriptFilePath $argumentString" -Wait
 }
 
 # Timer to measure copy rate of non-metadata data
