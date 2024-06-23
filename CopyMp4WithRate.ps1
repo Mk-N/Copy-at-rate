@@ -11,8 +11,9 @@ param (
     [string]$graphDirectory2 = "", # Optional second directory for second graph
     [string]$dataRateGraphName = "data_rate_vs_bytes_copied.svg", # Name of the data rate vs bytes copied graph
     [string]$sleepChunkGraphName = "sleep_time_chunk_size_vs_bytes_copied.svg", # Name of the sleep time and chunk size vs bytes copied graph
-    [string]$pythonScriptFilePath = "",
-    [string]$venvActivateScript = "D:\Creative work\Copy-at-rate\.venv\Scripts\Activate.ps1"
+    [string]$pythonScriptFilePath = "", # For the python graphing file
+    [string]$venvActivateScript = "",
+    [decimal]$rateMultiplier = 1 # Add ability to go faster than necessary to build up buffer
 )
 
 # Function to perform accurate division of a numerator by a denominator
@@ -179,7 +180,7 @@ catch {
 }
 
 # Calculate the required rate in bytes per second
-[decimal]$rateBps = ($fileSize - $metadataSize) / $videoDuration
+[decimal]$rateBps = (($fileSize - $metadataSize) / $videoDuration) * $rateMultiplier
 [decimal]$targetRateKBps = $rateBps / 1024
 Write-Log "Required rate: $rateBps bytes per second ($targetRateKBps KBps)"
 
@@ -259,8 +260,6 @@ try {
 
         # Calculate elapsed time and actual copy rate
         [decimal]$elapsedTime = $startTime.Elapsed.TotalSeconds
-        Write-Log "$elapsedTime"
-        Write-Log "$totalBytesAtRateRead"
         [decimal]$actualRateBps = $totalBytesAtRateRead / $elapsedTime
         [decimal]$actualRateKBps = $actualRateBps / 1024
 
