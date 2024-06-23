@@ -3,17 +3,6 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 
-log_file_path = sys.argv[1]
-graph_directory = sys.argv[2]
-
-if sys.argv[3] == "":
-	graph_directory2 = graph_directory
-else:
-	graph_directory2 = sys.argv[3]
-
-dataRateGraphName = sys.argv[4]
-sleepChunkGraphName = sys.argv[5]
-
 def update_graphs(i):
 	data = pd.read_csv(log_file_path)
 
@@ -42,6 +31,17 @@ def update_graphs(i):
 if __name__ == "__main__":
 	plt.figure(1)
 	plt.figure(2)
+
+	log_file_path = sys.argv[1]
+	graph_directory = sys.argv[2]
+
+	if sys.argv[3] == "":
+		graph_directory2 = graph_directory
+	else:
+		graph_directory2 = sys.argv[3]
+
+	dataRateGraphName = sys.argv[4]
+	sleepChunkGraphName = sys.argv[5]
 
 	anim1 = FuncAnimation(plt.figure(1), update_graphs, interval=1000)
 	anim2 = FuncAnimation(plt.figure(2), update_graphs, interval=1000)
