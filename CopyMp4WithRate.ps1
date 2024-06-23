@@ -164,13 +164,13 @@ catch {
 # Separating the bytes of non-metadata and metadata data apart, so that target time and actual rate is calculated accurately.
 $totalBytesAtRateRead = 0
 
-# Timer to measure copy rate of non-metadata data
-$startTime = [System.Diagnostics.Stopwatch]::StartNew()
-
 if ($enableGraphs) {
     # Start the Python script for dynamic graphing
     Start-Process "python" -ArgumentList "$PythonScriptFilePath", $logFilePath, $graphDirectory, $graphDirectory2, $dataRateGraphName, $sleepChunkGraphName
 }
+
+# Timer to measure copy rate of non-metadata data
+$startTime = [System.Diagnostics.Stopwatch]::StartNew()
 
 try {
     while (($bytesRead = $sourceStream.Read($buffer, 0, $buffer.Length)) -gt 0) {
