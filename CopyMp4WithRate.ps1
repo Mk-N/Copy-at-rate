@@ -138,7 +138,7 @@ $sourceStream = [System.IO.File]::OpenRead($sourceFilePath)
 $destinationStream = [System.IO.File]::Open($destinationFilePath, [System.IO.FileMode]::Create, [System.IO.FileAccess]::Write, [System.IO.FileShare]::Read)
 
 $buffer = New-Object byte[] $chunkSize
-[UInt64]$totalBytesRead = 0
+[UInt128]$totalBytesRead = 0
 
 # Function to copy the initial metadata quickly
 function CopyInitialBuffer($initialBytes) {
@@ -151,7 +151,7 @@ function CopyInitialBuffer($initialBytes) {
 # Copy the metadata and initial buffer (user-defined)
 $initialBytes = $metadataSize + $bufferSizeBytes
 try {
-    [UInt64]$totalBytesRead += CopyInitialBuffer $initialBytes
+    [UInt128]$totalBytesRead += CopyInitialBuffer $initialBytes
     Write-Log "Initial metadata and buffer of $initialBytes bytes copied quickly."
 }
 catch {
@@ -162,7 +162,7 @@ catch {
 }
 
 # Separating the bytes of non-metadata and metadata data apart, so that target time and actual rate is calculated accurately.
-[UInt64]$totalBytesAtRateRead = 0
+[UInt128]$totalBytesAtRateRead = 0
 
 if ($enableGraphs) {
     # Start the Python script for dynamic graphing
@@ -175,8 +175,8 @@ $startTime = [System.Diagnostics.Stopwatch]::StartNew()
 try {
     while (($bytesRead = $sourceStream.Read($buffer, 0, $buffer.Length)) -gt 0) {
         $destinationStream.Write($buffer, 0, $bytesRead)
-        [UInt64]$totalBytesAtRateRead += $bytesRead
-        [UInt64]$totalBytesRead += $totalBytesAtRateRead
+        [UInt128]$totalBytesAtRateRead += $bytesRead
+        [UInt128]$totalBytesRead += $totalBytesAtRateRead
 
         # Calculate elapsed time and actual copy rate
         [decimal]$elapsedTime = $startTime.Elapsed.TotalSeconds
